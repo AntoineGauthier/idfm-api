@@ -33,3 +33,14 @@ def test_missing_vehicle_features_returns_empty_list():
     traffic = TrafficData.from_json(payload)
 
     assert traffic.vehicle_features == []
+
+
+def test_departure_time_is_preferred_over_arrival_time():
+    payload = _base_payload()
+    payload["MonitoredVehicleJourney"]["MonitoredCall"][
+        "ExpectedDepartureTime"
+    ] = "2026-08-25T06:43:00.000Z"
+
+    traffic = TrafficData.from_json(payload)
+
+    assert traffic.schedule.isoformat() == "2026-08-25T06:43:00+00:00"

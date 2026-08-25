@@ -202,17 +202,17 @@ class TrafficData:
             note = ""
 
         sch = None
-        if "ExpectedArrivalTime" in data["MonitoredVehicleJourney"]["MonitoredCall"]:
-            sch = datetime.strptime(
-                data["MonitoredVehicleJourney"]["MonitoredCall"]["ExpectedArrivalTime"],
-                "%Y-%m-%dT%H:%M:%S.%fZ",
-            ).replace(tzinfo=timezone.utc)
-        elif (
-            "ExpectedDepartureTime" in data["MonitoredVehicleJourney"]["MonitoredCall"]
-        ):
+        if "ExpectedDepartureTime" in data["MonitoredVehicleJourney"]["MonitoredCall"]:
             sch = datetime.strptime(
                 data["MonitoredVehicleJourney"]["MonitoredCall"][
                     "ExpectedDepartureTime"
+                ],
+                "%Y-%m-%dT%H:%M:%S.%fZ",
+            ).replace(tzinfo=timezone.utc)
+        elif "ExpectedArrivalTime" in data["MonitoredVehicleJourney"]["MonitoredCall"]:
+            sch = datetime.strptime(
+                data["MonitoredVehicleJourney"]["MonitoredCall"][
+                    "ExpectedArrivalTime"
                 ],
                 "%Y-%m-%dT%H:%M:%S.%fZ",
             ).replace(tzinfo=timezone.utc)
