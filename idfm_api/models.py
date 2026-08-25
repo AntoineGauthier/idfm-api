@@ -187,6 +187,7 @@ class TrafficData:
     at_stop: bool
     platform: str
     status: str
+    vehicle_features: list[str]
 
     @staticmethod
     def from_json(data: dict):
@@ -266,6 +267,9 @@ class TrafficData:
             at_stop=atstop,
             platform=plat,
             status=status,
+            vehicle_features=data["MonitoredVehicleJourney"].get(
+                "VehicleFeatureRef", []
+            ),
         )
 
     def __eq__(self, other):
