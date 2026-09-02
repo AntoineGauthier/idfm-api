@@ -1,3 +1,5 @@
+import logging
+
 from idfm_api.models import TrafficData
 
 
@@ -33,3 +35,22 @@ def test_missing_vehicle_features_returns_empty_list():
     traffic = TrafficData.from_json(payload)
 
     assert traffic.vehicle_features == []
+
+
+def test_missing_expected_time_is_logged_and_still_discarded(caplog):
+    payload = _base_payload()
+    journey = payload["MonitoredVehicleJourney"]
+    journey["DatedVehicleJourneyRef"] = {"value": "journey-123"}
+    call = journey["MonitoredCall"]
+    del call["ExpectedArrivalTime"]
+    call["AimedDepartureTime"] = "2026-08-25T06:40:00.000Z"
+    call["DepartureStatus"] = "delayed"
+
+    with caplog.at_level(logging.WARNING, logger="idfm_api.models"):
+        traffic = TrafficData.from_json(payload)
+
+    assert traffic is None
+    assert "IDFM MISSING EXPECTED TIME" in caplog.text
+    assert "AimedDepartureTime" in caplog.text
+    assert "journey-123" in caplog.text
+    assert "delayed" in caplog.text
