@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum, unique
@@ -5,6 +6,9 @@ from functools import total_ordering
 from zoneinfo import ZoneInfo
 
 from idfm_api.utils import strip_html
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @unique
@@ -39,7 +43,7 @@ class TransportStatus(str, Enum):
 @dataclass(frozen=True)
 class LineData:
     """
-    Represents a line of a transport
+    Represents the type of transport
     """
 
     name: str
@@ -217,6 +221,32 @@ class TrafficData:
                 "%Y-%m-%dT%H:%M:%S.%fZ",
             ).replace(tzinfo=timezone.utc)
         else:
+            journey = data["MonitoredVehicleJourney"]
+            monitored_call = journey["MonitoredCall"]
+            timing_fields = {
+                key: value
+                for key, value in monitored_call.items()
+                if "Time" in key
+            }
+            journey_ref = (
+                journey.get("DatedVehicleJourneyRef")
+                or journey.get("VehicleJourneyRef")
+                or journey.get("FramedVehicleJourneyRef")
+            )
+            _LOGGER.warning(
+                "IDFM MISSING EXPECTED TIME | line=%s destination=%s "
+                "destination_ref=%s direction=%s arrival_status=%s "
+                "departure_status=%s at_stop=%s journey_ref=%s timing=%s",
+                journey.get("LineRef"),
+                journey.get("DestinationName"),
+                journey.get("DestinationRef"),
+                journey.get("DirectionName"),
+                monitored_call.get("ArrivalStatus"),
+                monitored_call.get("DepartureStatus"),
+                monitored_call.get("VehicleAtStop"),
+                journey_ref,
+                timing_fields,
+            )
             return None
 
         try:
