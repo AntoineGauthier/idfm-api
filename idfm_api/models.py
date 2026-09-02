@@ -43,7 +43,7 @@ class TransportStatus(str, Enum):
 @dataclass(frozen=True)
 class LineData:
     """
-    Represents the type of transport
+    Represents a line of a transport
     """
 
     name: str
