@@ -235,7 +235,7 @@ class IDFMApi:
         Args:
             stop_id: A string indicating the id of the depart stop area
             direction_name: The direction of a train
-            line_id: A string indicating id of a line
+            line_id: A string indicating id of a line (if not specified, all destinations for this stop will be returned regardless of the line)
         Returns:
             A list of string representing the stations names
         """
@@ -254,7 +254,7 @@ class IDFMApi:
 
         Args:
             stop_id: A string indicating the id of the depart stop area
-            line_id: A string indicating id of a line
+            line_id: A string indicating id of a line (if not specified, all directions for this stop will be returned regardless of the line)
         Returns:
             A list of string representing the stations names
         """
@@ -265,12 +265,12 @@ class IDFMApi:
 
     async def get_infos(self, line_id: str) -> List[InfoData]:
         """
-        Return the traffic informations (usually the current/planned perturbations) for the specified line
+        Returns the traffic informations (usually the current/planned perturbations) for the specified line
 
         Warning: DEPRECATED in favor of get_line_reports
 
         Args:
-            line_id: A string indicating id of a line
+            line_id: A string indicating the id of a line
         Returns:
             A list of InfoData objects, the list is empty if no perturbations are registered
         """
@@ -290,7 +290,7 @@ class IDFMApi:
         Return the traffic informations (usually the current/planned perturbations) for the specified line
 
         Args:
-            line_id: A string indicating id of a line
+            line_id: A string indicating the id of a line
             exclude_elevator: if the elevator failures perturbations should be ignored
         Returns:
             A list of InfoData objects, the list is empty if no perturbations are registered
@@ -322,7 +322,7 @@ class IDFMApi:
         """
         ret = []
         data = await Dataset.get_lines(self._session)
-        if line_id in data:
+        if transport.value in data:
             for name, id in data[transport.value].items():
                 ret.append(LineData(name=name, id=id, type=transport))
         return ret
