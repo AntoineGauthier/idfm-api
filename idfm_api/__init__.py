@@ -176,6 +176,7 @@ class IDFMApi:
             response = await self.__request(request)
 
         ret = []
+        accepted_diagnostics = []
         for i in response["MonitoredStopVisit"]:
             d = TrafficData.from_json(i)
             if (
@@ -184,6 +185,42 @@ class IDFMApi:
                 and (destination_name is None or d.destination_name == destination_name)
             ):
                 ret.append(d)
+                journey = i.get("MonitoredVehicleJourney", {})
+                monitored_call = journey.get("MonitoredCall", {})
+                journey_ref = (
+                    journey.get("DatedVehicleJourneyRef")
+                    or journey.get("VehicleJourneyRef")
+                    or journey.get("FramedVehicleJourneyRef")
+                )
+                if isinstance(journey_ref, dict):
+                    journey_ref = journey_ref.get("value") or journey_ref
+                accepted_diagnostics.append(
+                    {
+                        "journey_ref": journey_ref,
+                        "destination": d.destination_name,
+                        "direction": d.direction,
+                        "schedule": d.schedule.isoformat() if d.schedule else None,
+                        "expected_arrival": monitored_call.get("ExpectedArrivalTime"),
+                        "expected_departure": monitored_call.get("ExpectedDepartureTime"),
+                        "aimed_arrival": monitored_call.get("AimedArrivalTime"),
+                        "aimed_departure": monitored_call.get("AimedDepartureTime"),
+                        "arrival_status": monitored_call.get("ArrivalStatus"),
+                        "departure_status": monitored_call.get("DepartureStatus"),
+                        "at_stop": monitored_call.get("VehicleAtStop"),
+                    }
+                )
+
+        if len(accepted_diagnostics) > 1:
+            _LOGGER.warning(
+                "IDFM MULTIPLE TRAFFIC ITEMS | stop=%s line=%s destination_filter=%s "
+                "direction_filter=%s items=%s",
+                stop_id,
+                line_id,
+                destination_name,
+                direction_name,
+                accepted_diagnostics,
+            )
+
         return sorted(ret)
 
     async def get_destinations(
@@ -198,7 +235,7 @@ class IDFMApi:
         Args:
             stop_id: A string indicating the id of the depart stop area
             direction_name: The direction of a train
-            line_id: A string indicating id of a line (if not specified, all destinations for this stop will be returned regardless of the line)
+            line_id: A string indicating id of a line
         Returns:
             A list of string representing the stations names
         """
@@ -217,7 +254,7 @@ class IDFMApi:
 
         Args:
             stop_id: A string indicating the id of the depart stop area
-            line_id: A string indicating id of a line (if not specified, all directions for this stop will be returned regardless of the line)
+            line_id: A string indicating id of a line
         Returns:
             A list of string representing the stations names
         """
@@ -228,12 +265,12 @@ class IDFMApi:
 
     async def get_infos(self, line_id: str) -> List[InfoData]:
         """
-        Returns the traffic informations (usually the current/planned perturbations) for the specified line
+        Return the traffic informations (usually the current/planned perturbations) for the specified line
 
         Warning: DEPRECATED in favor of get_line_reports
 
         Args:
-            line_id: A string indicating the id of a line
+            line_id: A string indicating id of a line
         Returns:
             A list of InfoData objects, the list is empty if no perturbations are registered
         """
@@ -253,7 +290,7 @@ class IDFMApi:
         Return the traffic informations (usually the current/planned perturbations) for the specified line
 
         Args:
-            line_id: A string indicating the id of a line
+            line_id: A string indicating id of a line
             exclude_elevator: if the elevator failures perturbations should be ignored
         Returns:
             A list of InfoData objects, the list is empty if no perturbations are registered
@@ -285,7 +322,7 @@ class IDFMApi:
         """
         ret = []
         data = await Dataset.get_lines(self._session)
-        if transport.value in data:
+        if line_id in data:
             for name, id in data[transport.value].items():
                 ret.append(LineData(name=name, id=id, type=transport))
         return ret
