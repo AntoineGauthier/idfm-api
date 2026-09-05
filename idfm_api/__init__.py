@@ -19,6 +19,39 @@ TIMEOUT = 60
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
 
+def _deduplicate_traffic(records):
+    """Collapse PRIM records that describe the same aimed departure service.
+
+    PRIM can expose several journey references for the same operational service.
+    Only records with an exact AimedDepartureTime match are grouped; records
+    without that field remain independent.  Within a group, retain the earliest
+    current prediction so a passenger-facing consumer never understates urgency.
+    """
+    grouped = {}
+    ungrouped = []
+
+    for traffic, raw in records:
+        journey = raw.get("MonitoredVehicleJourney", {})
+        monitored_call = journey.get("MonitoredCall", {})
+        aimed_departure = monitored_call.get("AimedDepartureTime")
+
+        if not aimed_departure:
+            ungrouped.append(traffic)
+            continue
+
+        key = (
+            traffic.line_id,
+            traffic.destination_id,
+            traffic.direction,
+            aimed_departure,
+        )
+        current = grouped.get(key)
+        if current is None or traffic.schedule < current.schedule:
+            grouped[key] = traffic
+
+    return sorted([*grouped.values(), *ungrouped])
+
+
 class IDFMApi:
     def __init__(
         self, session: aiohttp.ClientSession, apikey: str, timeout: int = TIMEOUT
@@ -175,7 +208,7 @@ class IDFMApi:
             )
             response = await self.__request(request)
 
-        ret = []
+        accepted_records = []
         accepted_diagnostics = []
         for i in response["MonitoredStopVisit"]:
             d = TrafficData.from_json(i)
@@ -184,7 +217,7 @@ class IDFMApi:
                 and (direction_name is None or d.direction == direction_name)
                 and (destination_name is None or d.destination_name == destination_name)
             ):
-                ret.append(d)
+                accepted_records.append((d, i))
                 journey = i.get("MonitoredVehicleJourney", {})
                 monitored_call = journey.get("MonitoredCall", {})
                 journey_ref = (
@@ -221,7 +254,7 @@ class IDFMApi:
                 accepted_diagnostics,
             )
 
-        return sorted(ret)
+        return _deduplicate_traffic(accepted_records)
 
     async def get_destinations(
         self,
@@ -290,7 +323,7 @@ class IDFMApi:
         Return the traffic informations (usually the current/planned perturbations) for the specified line
 
         Args:
-            line_id: A string indicating the id of a line
+            line_id: A string indicating id of a line
             exclude_elevator: if the elevator failures perturbations should be ignored
         Returns:
             A list of InfoData objects, the list is empty if no perturbations are registered
