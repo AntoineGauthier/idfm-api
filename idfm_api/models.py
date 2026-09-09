@@ -187,6 +187,7 @@ class TrafficData:
     at_stop: bool
     platform: str
     status: str
+    vehicle_features: list[str]
 
     @staticmethod
     def from_json(data: dict):
@@ -200,51 +201,33 @@ class TrafficData:
         except (KeyError, IndexError):
             note = ""
 
+        call = data["MonitoredVehicleJourney"]["MonitoredCall"]
         sch = None
-        if "ExpectedArrivalTime" in data["MonitoredVehicleJourney"]["MonitoredCall"]:
+        if "ExpectedDepartureTime" in call:
             sch = datetime.strptime(
-                data["MonitoredVehicleJourney"]["MonitoredCall"]["ExpectedArrivalTime"],
-                "%Y-%m-%dT%H:%M:%S.%fZ",
+                call["ExpectedDepartureTime"], "%Y-%m-%dT%H:%M:%S.%fZ"
             ).replace(tzinfo=timezone.utc)
-        elif (
-            "ExpectedDepartureTime" in data["MonitoredVehicleJourney"]["MonitoredCall"]
-        ):
+        elif "ExpectedArrivalTime" in call:
             sch = datetime.strptime(
-                data["MonitoredVehicleJourney"]["MonitoredCall"][
-                    "ExpectedDepartureTime"
-                ],
-                "%Y-%m-%dT%H:%M:%S.%fZ",
+                call["ExpectedArrivalTime"], "%Y-%m-%dT%H:%M:%S.%fZ"
             ).replace(tzinfo=timezone.utc)
         else:
             return None
 
         try:
-            atstop = data["MonitoredVehicleJourney"]["MonitoredCall"]["VehicleAtStop"]
+            atstop = call["VehicleAtStop"]
         except KeyError:
             atstop = None
 
         try:
-            plat = data["MonitoredVehicleJourney"]["MonitoredCall"][
-                "ArrivalPlatformName"
-            ]["value"]
+            plat = call["ArrivalPlatformName"]["value"]
         except KeyError:
             plat = ""
 
-        if (
-            "ArrivalStatus" in data["MonitoredVehicleJourney"]["MonitoredCall"]
-            and data["MonitoredVehicleJourney"]["MonitoredCall"]["ArrivalStatus"] != ""
-        ):
-            status = TransportStatus(
-                data["MonitoredVehicleJourney"]["MonitoredCall"]["ArrivalStatus"]
-            )
-        elif (
-            "DepartureStatus" in data["MonitoredVehicleJourney"]["MonitoredCall"]
-            and data["MonitoredVehicleJourney"]["MonitoredCall"]["DepartureStatus"]
-            != ""
-        ):
-            status = TransportStatus(
-                data["MonitoredVehicleJourney"]["MonitoredCall"]["DepartureStatus"]
-            )
+        if "DepartureStatus" in call and call["DepartureStatus"] != "":
+            status = TransportStatus(call["DepartureStatus"])
+        elif "ArrivalStatus" in call and call["ArrivalStatus"] != "":
+            status = TransportStatus(call["ArrivalStatus"])
         else:
             status = TransportStatus.UNKNOWN
 
@@ -266,6 +249,9 @@ class TrafficData:
             at_stop=atstop,
             platform=plat,
             status=status,
+            vehicle_features=data["MonitoredVehicleJourney"].get(
+                "VehicleFeatureRef", []
+            ),
         )
 
     def __eq__(self, other):
